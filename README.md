@@ -6,7 +6,12 @@ The context is that you have
 - you want to run a NTP server i.e. chrony on the Mac
 - you therefore want to determine very precisely the time of each pulse with respect to the Mac's system clock
 
-For more background, see Jeff Geerling's [blog post](https://www.jeffgeerling.com/blog/2025/using-gps-most-accurate-time-possible-on-mac).
+For more background, see Jeff Geerling's [blog post](https://www.jeffgeerling.com/blog/2025/using-gps-most-accurate-time-possible-on-mac). Jeff suggests a couple of possibilities
+
+- don't use PPS; just rely on timing derived from NMEA messages (Jeff claims this can achieve 1ms precision, but I think that is an illusion)
+- use Linux in a VM (e.g. using Docker) with USB pass through; this allows you to leverage Linux kernel support for PPS (I haven;t tried this but it's a plausible approach)
+
+This repo is an attempt to provide some additional possibilities.
 
 ## Polling modem status lines
 
@@ -14,7 +19,7 @@ The first experiment, which is implemented by the `pollpps` program, explores th
 
 ![usbttl](https://github.com/user-attachments/assets/227569bf-45b0-44bf-9d60-345059552a1c)
 
-Now gpsd implements a similar approach but requires an OS that supports TIOCMIWAIT, which avoids the need to poll. Unfortunately macOS doesn't support this, so gpsd does not support PPS on macOS.
+In fact, gpsd implements a similar approach but requires an OS that supports TIOCMIWAIT, which avoids the need to poll. Unfortunately macOS doesn't support this, so gpsd does not support PPS on macOS.
 
 The obvious downside of polling is the CPU usage from having to poll extremely frequently. But modern CPUs have sufficient capacity to make this approach is viable. There are also some tricks (not yet implemented) that we could use to reduce CPU usage. For example, once we have detected a pulse edge, we know that the next edge will not happen for a second, so we can stop polling frequently for nearly a second.
 
