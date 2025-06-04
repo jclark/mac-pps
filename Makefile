@@ -1,9 +1,10 @@
 all: pollpps audiopps
 
-pollpps: pollpps.c
+pollpps: pollpps.c chrony_client.c chrony_client.h
+	$(CC) -o pollpps pollpps.c chrony_client.c
 
-audiopps: audiopps.c
-	$(CC) -o audiopps audiopps.c -framework CoreAudio -framework AudioToolbox -framework CoreFoundation
+audiopps: audiopps.c chrony_client.c chrony_client.h
+	$(CC) -o audiopps audiopps.c chrony_client.c -framework CoreAudio -framework AudioToolbox -framework CoreFoundation
 
 clean:
 	-rm -f pollpps audiopps

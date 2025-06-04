@@ -9,20 +9,62 @@
 #include <signal.h>
 #include <errno.h>
 #include <stdbool.h>
+#include "chrony_client.h"
+
+#define DEFAULT_REMOTE_PATH "/var/run/chrony.pollpps.sock"
 
 static volatile sig_atomic_t interrupted = 0;
+static chrony_client_t *chrony_client = NULL;
+static char remote_path[256] = DEFAULT_REMOTE_PATH;
+static bool use_chrony = false;
 
 void handle_signal(int sig) {
     interrupted = 1;
 }
 
+void print_usage(const char *prog) {
+    fprintf(stderr, "usage: %s [options] <device>\n", prog);
+    fprintf(stderr, "options:\n");
+    fprintf(stderr, "  -c, --chrony             Send samples to chrony\n");
+    fprintf(stderr, "  -r, --remote-path PATH   Remote chrony socket path (default: %s)\n", DEFAULT_REMOTE_PATH);
+    fprintf(stderr, "  -h, --help              Show this help\n");
+}
+
 int main(int argc, char *argv[]) {
-    if (argc != 2) {
-        fprintf(stderr, "usage: %s <device>\n", argv[0]);
+    const char *device = NULL;
+    
+    for (int i = 1; i < argc; i++) {
+        if (strcmp(argv[i], "-c") == 0 || strcmp(argv[i], "--chrony") == 0) {
+            use_chrony = true;
+        } else if (strcmp(argv[i], "-r") == 0 || strcmp(argv[i], "--remote-path") == 0) {
+            if (i + 1 >= argc) {
+                fprintf(stderr, "Error: %s requires an argument\n", argv[i]);
+                print_usage(argv[0]);
+                return 1;
+            }
+            strncpy(remote_path, argv[++i], sizeof(remote_path) - 1);
+            remote_path[sizeof(remote_path) - 1] = '\0';
+        } else if (strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "--help") == 0) {
+            print_usage(argv[0]);
+            return 0;
+        } else if (argv[i][0] == '-') {
+            fprintf(stderr, "Error: Unknown option %s\n", argv[i]);
+            print_usage(argv[0]);
+            return 1;
+        } else if (device == NULL) {
+            device = argv[i];
+        } else {
+            fprintf(stderr, "Error: Too many arguments\n");
+            print_usage(argv[0]);
+            return 1;
+        }
+    }
+    
+    if (device == NULL) {
+        fprintf(stderr, "Error: Device argument required\n");
+        print_usage(argv[0]);
         return 1;
     }
-
-    const char *device = argv[1];
     
     /* Open serial port */
     int fd = open(device, O_RDWR | O_NOCTTY);
@@ -49,11 +91,28 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
+    /* Set up chrony client if requested */
+    if (use_chrony) {
+        chrony_client = chrony_client_create(NULL, remote_path);
+        if (chrony_client == NULL) {
+            fprintf(stderr, "Failed to setup chrony client\n");
+            tcsetattr(fd, TCSANOW, &orig_tios);
+            close(fd);
+            return 1;
+        }
+    }
+
     /* Set up signal handler */
     signal(SIGINT, handle_signal);
     signal(SIGTERM, handle_signal);
 
     printf("Monitoring PPS on CTS line of %s\n", device);
+    if (use_chrony) {
+        printf("Local socket: %s\n", chrony_client_local_path(chrony_client));
+        printf("Remote socket: %s\n", chrony_client_remote_path(chrony_client));
+    } else {
+        printf("Chrony integration disabled\n");
+    }
 
     bool last_cts = false;
     int pps_count = 0;
@@ -87,16 +146,30 @@ int main(int argc, char *argv[]) {
             
             pps_count++;
             
-            /* Format time similar to Go output */
+            /* Calculate offset: system time fractional part minus true time (0.0 at top of second) */
+            double offset = ((double)ts.tv_nsec / 1000000000.0) - 0.0;
+            
+            /* Convert timespec to timeval for chrony */
+            struct timeval tv;
+            tv.tv_sec = ts.tv_sec;
+            tv.tv_usec = ts.tv_nsec / 1000;
+            
+            /* Send sample to chrony if enabled */
+            if (use_chrony && chrony_client_send_pps(chrony_client, &tv, offset) < 0) {
+                fprintf(stderr, "Failed to send chrony sample\n");
+            }
+            
+            /* Format time for debug output */
             struct tm *tm = localtime(&ts.tv_sec);
             char time_buf[64];
             strftime(time_buf, sizeof(time_buf), "%H:%M:%S", tm);
             
-            printf("PPS #%d at %s.%09ld (%ld.%09ld)\n",
+            printf("PPS #%d at %s.%09ld (%ld.%09ld) offset=%.6f\n",
                    pps_count,
                    time_buf,
                    ts.tv_nsec,
-                   ts.tv_sec, ts.tv_nsec);
+                   ts.tv_sec, ts.tv_nsec,
+                   offset);
         }
 
         last_cts = cts;
@@ -110,6 +183,11 @@ int main(int argc, char *argv[]) {
     }
 
     printf("\nReceived interrupt, shutting down...\n");
+
+    /* Cleanup chrony client */
+    if (chrony_client) {
+        chrony_client_destroy(chrony_client);
+    }
 
     /* Restore original terminal settings */
     tcsetattr(fd, TCSANOW, &orig_tios);
