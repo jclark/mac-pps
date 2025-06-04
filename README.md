@@ -9,7 +9,7 @@ The context is that you have
 For more background, see Jeff Geerling's [blog post](https://www.jeffgeerling.com/blog/2025/using-gps-most-accurate-time-possible-on-mac). Jeff suggests a couple of possibilities
 
 - don't use PPS; just rely on timing derived from NMEA messages (Jeff claims this can achieve 1ms precision, but I think that is an illusion)
-- use Linux in a VM (e.g. using Docker) with USB pass through; this allows you to leverage Linux kernel support for PPS (I haven;t tried this but it's a plausible approach)
+- use Linux in a VM (e.g. using Docker) with USB pass through; this allows you to leverage Linux kernel support for PPS (I haven't tried this but it's a plausible approach)
 
 This repo is an attempt to provide some additional possibilities.
 
