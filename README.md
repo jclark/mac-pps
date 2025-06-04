@@ -17,7 +17,7 @@ This repo is an attempt to provide some additional possibilities.
 
 The first experiment, which is implemented by the `pollpps` program, explores the idea of polling the modem status lines, specifically the CTS line. This requires a USB-to-TTL adapter that supports CTS/RTS, and then connect the PPS output of the GPS receiver to the CTS pin of the adapter. A suitable adapter is the [Waveshare USB-to-TTL converter](https://www.waveshare.com/usb-to-ttl.htm), which uses the FTDI FT232RNL.
 
-![usbttl](https://github.com/user-attachments/assets/227569bf-45b0-44bf-9d60-345059552a1c)
+![usbttl](assets/usbttl.jpg)
 
 In fact, gpsd implements a similar approach but requires an OS that supports TIOCMIWAIT, which avoids the need to poll. Unfortunately macOS doesn't support this, so gpsd does not support PPS on macOS.
 
@@ -67,8 +67,7 @@ I used a small breadboard to assemble it. The only soldering needed is to solder
 
 You also need a USB audio card with a LINE IN (not just a MIC IN). The one I found has multiple inputs and outputs including SPDIF. It cost about $9.
 
-![audio](https://github.com/user-attachments/assets/4c7faf32-2eda-4b74-8cc4-1c935b6b22f3)
-
+![audio](assets/audio.jpg)
 
 This needs a command like:
 
