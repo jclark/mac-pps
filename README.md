@@ -73,7 +73,7 @@ This needs a command like:
 
 First argument is the device; second argument is the input source. Use `./audiopps --list-devices` to get the available devices and their sources.
 
-Here's an example of what I see:
+Here's an example of what I see (on a Mac mini with the system clock synchronized using chrony to a high quality stratum 1 NTP server on the LAN):
 
 ```
 PPS detected at 1749040513.000411 (level: 0.161, sample: 97/1024)
