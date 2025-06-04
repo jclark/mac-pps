@@ -1,5 +1,7 @@
 # Audio PPS Daemon Development Plan
 
+Current status: stage 2.2 implemented.
+
 ## 1. Background
 
 The goal of this project is to create a high-precision timing daemon for macOS. It will capture a one-pulse-per-second (PPS) signal from a GPS receiver, which has been converted into an audio impulse and fed into a USB audio device. The daemon will precisely timestamp this pulse, calculate the system clock's offset from this "true time" reference, and feed the correction to the `chrony` daemon via its `SOCK` driver interface. This provides a robust, microsecond-accurate time synchronization source for a Mac.
@@ -77,27 +79,36 @@ The goal of this project is to create a high-precision timing daemon for macOS. 
 
 **Objective:** Take the timestamp from Phase 1, calculate the clock offset, and send it to `chrony` over its UNIX socket.
 
-### 2.1 UNIX Socket Implementation
-- **Action:** Add the C code to manage the UNIX domain datagram socket.
-- **Details:**
-    - Create a socket of type `AF_UNIX` and `SOCK_DGRAM`.
-    - Set up a `struct sockaddr_un` with the path to chrony's socket (e.g., `/var/run/chrony/chrony.sock`).
+**Status:** Shared chrony client library implemented (`chrony_client.c/h`) and integrated into `pollpps`. Integration into `audiopps` is next.
 
-### 2.2 Offset Calculation & Data Formatting
-- **Action:** Calculate the clock offset and populate the `chrony` data structure.
+### 2.1 Shared Chrony Client Library
+- **Action:** Create reusable chrony communication library.
 - **Details:**
-    - Define the `struct refclock_sock_sample` in your code.
-    - After getting the pulse's `timeval`, calculate the offset. This is the microsecond part of the timestamp (`pulse_time.tv_usec`). Convert this to a `double` representing seconds (e.g., `2500` usec becomes `0.0025`).
-    - Populate the fields of your `refclock_sock_sample` struct with the `timeval` and the calculated `offset`.
+    - Implements proper `sock_sample` structure matching chrony source code
+    - Creates local Unix datagram socket with PID-based naming (e.g., `/tmp/pps-chrony{PID}.sock`)
+    - Manages remote socket connection to chrony (configurable path)
+    - Handles socket cleanup and error conditions
+    - API: `chrony_client_create()`, `chrony_client_send_pps()`, `chrony_client_destroy()`
 
-### 2.3 Data Transmission
-- **Action:** Send the data packet to the `chrony` daemon.
+### 2.2 Integration with pollpps 
+- **Action:** Add chrony support to modem status line program.
 - **Details:**
-    - In the audio callback, instead of `printf`, use `sendto()` to send the populated `refclock_sock_sample` struct to the `chrony` socket.
-    - Configure `chrony.conf` to accept the `SOCK` driver data and restart `chronyd`.
-    - Use `chronyc sources -v` to verify that `chrony` is receiving and using the samples.
+    - Uses shared chrony_client library
+    - Calculates correct offset: `system_time_fractional - 0.0` (positive when system ahead)
+    - Optional chrony integration via `--chrony` flag
+    - Configurable remote socket path via `--remote-path`
+    - Tested and working with chrony SOCK refclock driver
 
-**Success at the end of this phase means `chrony` recognizes your daemon as a reference clock.**
+### 2.3 Integration with audiopps
+- **Action:** Add chrony support to audio-based PPS program.
+- **Details:**
+    - Link with shared chrony_client library (Makefile already configured)
+    - Add command line options (`--chrony`, `--remote-path`)
+    - Convert audio timestamps to chrony format
+    - Calculate offset from sample-accurate timing
+    - Test integration with chrony
+
+**Success at the end of this phase means both `pollpps` and `audiopps` can send timing data to chrony as reference clocks.**
 
 ---
 
