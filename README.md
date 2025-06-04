@@ -68,5 +68,40 @@ This needs a command like:
 
 First argument is the device; second argument is the input source. Use `./audiopps --list-devices` to get the available devices and their sources.
 
+Here's an example of what I see:
+
+```
+PPS detected at 1749040513.000411 (level: 0.161, sample: 97/1024)
+PPS detected at 1749040514.000419 (level: 0.262, sample: 997/1024)
+PPS detected at 1749040515.000429 (level: 0.186, sample: 872/1024)
+PPS detected at 1749040516.000416 (level: 0.274, sample: 748/1024)
+PPS detected at 1749040517.000364 (level: 0.215, sample: 623/1024)
+PPS detected at 1749040518.000387 (level: 0.120, sample: 498/1024)
+PPS detected at 1749040519.000383 (level: 0.235, sample: 386/1024)
+PPS detected at 1749040520.000390 (level: 0.153, sample: 389/1024)
+PPS detected at 1749040521.000408 (level: 0.255, sample: 393/1024)
+PPS detected at 1749040522.000401 (level: 0.183, sample: 396/1024)
+PPS detected at 1749040523.000389 (level: 0.266, sample: 400/1024)
+PPS detected at 1749040524.000388 (level: 0.209, sample: 403/1024)
+PPS detected at 1749040525.000367 (level: 0.115, sample: 406/1024)
+PPS detected at 1749040526.000392 (level: 0.234, sample: 410/1024)
+PPS detected at 1749040527.000382 (level: 0.143, sample: 413/1024)
+PPS detected at 1749040528.000415 (level: 0.254, sample: 417/1024)
+PPS detected at 1749040529.000391 (level: 0.175, sample: 420/1024)
+PPS detected at 1749040530.000393 (level: 0.262, sample: 424/1024)
+PPS detected at 1749040531.000393 (level: 0.203, sample: 427/1024)
+PPS detected at 1749040532.000360 (level: 0.107, sample: 430/1024)
+PPS detected at 1749040533.000381 (level: 0.223, sample: 434/1024)
+PPS detected at 1749040534.000382 (level: 0.137, sample: 437/1024)
+PPS detected at 1749040535.000398 (level: 0.247, sample: 441/1024)
+PPS detected at 1749040536.000388 (level: 0.164, sample: 444/1024)
+PPS detected at 1749040537.000387 (level: 0.265, sample: 448/1024)
+PPS detected at 1749040538.000379 (level: 0.196, sample: 451/1024)
+PPS detected at 1749040539.000389 (level: 0.270, sample: 455/1024)
+PPS detected at 1749040540.000374 (level: 0.222, sample: 458/1024)
+```
+
+This is an order of magnitude better than the modem status line polling.
+
 I haven't yet hooked this up to chrony.
 
