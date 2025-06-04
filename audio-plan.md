@@ -17,39 +17,59 @@ The goal of this project is to create a high-precision timing daemon for macOS. 
     - Implement a `main()` function that sets up a `CFRunLoop`.
     - Add a signal handler for `SIGINT` and `SIGTERM` that calls `CFRunLoopStop()` to ensure a clean shutdown. This forms the basic structure of a long-running console application.
 
-### 1.2 Audio Device Discovery
-- **Action:** Write a utility function to enumerate and list available audio input devices.
+### 1.2 Audio Device Discovery & Input Source Selection
+- **Action:** Write utility functions to enumerate audio input devices and their available input sources.
 - **Details:**
     - Use `AudioObjectGetPropertyData` with `kAudioHardwarePropertyDevices` to get all `AudioDeviceID`s.
     - Iterate through the IDs, querying properties like `kAudioDevicePropertyDeviceName` and `kAudioDevicePropertyDeviceUID`.
-    - Print a list of devices so you can copy the `UID` of your specific USB audio interface for later use.
+    - For each device, enumerate available input sources using `kAudioDevicePropertyDataSources` and `kAudioDevicePropertyDataSourceNameForIDCFString`.
+    - Implement functions to find devices by UID and input sources by name.
+    - Add `--list-devices` command line option to display all devices and their input sources.
+    - Print device UIDs and input source names so users can specify exact audio routing (e.g., "External Line Connector").
 
 ### 1.3 Audio Capture Implementation
 - **Action:** Set up `AudioQueueServices` to capture audio from the target device.
 - **Details:**
-    - Define an `AudioStreamBasicDescription` for the desired input format (e.g., 48kHz, 32-bit float, mono).
+    - Define an `AudioStreamBasicDescription` for the desired input format (48kHz, 32-bit float, mono).
     - Create a new `AudioQueue` with `AudioQueueNewInput`.
+    - **Critical discovery:** AudioQueue device selection requires passing the device UID as a `CFStringRef` to `AudioQueueSetProperty` with `kAudioQueueProperty_CurrentDevice`, not an `AudioDeviceID`.
+    - Set the input source on the selected device using `AudioObjectSetPropertyData` with `kAudioDevicePropertyDataSource`.
     - Allocate several buffers with `AudioQueueAllocateBuffer` and enqueue them with `AudioQueueEnqueueBuffer`.
-    - Implement the `AudioQueueInputCallback` function. Initially, this can just log that it has been called.
+    - Implement the `AudioQueueInputCallback` function with pulse detection logic.
     - Start the queue with `AudioQueueStart`.
 
-### 1.4 Pulse Detection Logic
-- **Action:** Implement a simple pulse detection algorithm inside the callback.
+### 1.4 Pulse Detection Logic & Debugging
+- **Action:** Implement a configurable pulse detection algorithm with debugging capabilities.
 - **Details:**
     - Within the callback, iterate through the sample data in the `inBuffer`.
-    - Implement a basic threshold detector: find the first sample whose absolute value exceeds a predefined level (e.g., `0.5`).
-    - Once detected, note the sample's index within the buffer. For now, we'll ignore this offset for simplicity.
+    - Implement a threshold detector: find the first sample whose absolute value exceeds a configurable level (default 0.5, adjustable via `--threshold`).
+    - Add `--debug` mode to show audio levels every ~1 second to help diagnose signal levels.
+    - Track minimum and maximum audio levels in each buffer for debugging.
+    - Implement debouncing logic to prevent multiple detections within 0.5 seconds.
+    - Note the sample's index within the buffer for precise timing calculations.
 
 ### 1.5 High-Precision Time Conversion
-- **Action:** Integrate the robust time conversion logic. This is the key milestone for Phase 1.
+- **Action:** Integrate the robust time conversion logic with sample-level precision. This is the key milestone for Phase 1.
 - **Details:**
     - Create the `TimebaseInfo` struct and the `setup_timebase_info()` function to be called from `main()`.
-    - Implement the `convert_past_host_time_to_timeval()` function, which uses the "sandwiched" `gettimeofday()` between two `mach_absolute_time()` calls.
-    - When your pulse detection logic fires, take the `inStartTime->mHostTime` from the callback's `AudioTimeStamp`.
+    - Implement the `convert_past_host_time_to_timeval()` function, which uses the "sandwiched" `gettimeofday()` between two `mach_absolute_time()` calls and calculates the midpoint for maximum accuracy.
+    - When pulse detection fires, take the `inStartTime->mHostTime` from the callback's `AudioTimeStamp`.
+    - **Sample-level precision:** Calculate the exact time offset for the specific sample within the buffer using the sample rate (48kHz) and sample index.
+    - Add the sample offset to the buffer start time to get the precise pulse timestamp.
     - Call your conversion function to turn this monotonic `mHostTime` into a `struct timeval`.
-    - Print the resulting `tv_sec` and `tv_usec` to the console.
+    - Print the resulting `tv_sec` and `tv_usec` to the console, along with signal level and sample position for debugging.
 
-**Success at the end of this phase means you can run `./audiopps` and see an accurate UNIX timestamp printed once per second.**
+### 1.6 Command Line Interface
+- **Action:** Implement a complete command line interface for production use.
+- **Details:**
+    - Add `--help` option with usage information and examples.
+    - Add `--list-devices` to enumerate all audio devices and input sources.
+    - Add `--debug` mode for troubleshooting audio levels and detection.
+    - Add `--threshold N` to adjust pulse detection sensitivity.
+    - Support device UID and input source name as positional arguments.
+    - Provide clear error messages for invalid devices or input sources.
+
+**Success at the end of this phase means you can run `./audiopps "device-UID" "External Line Connector"` and see accurate UNIX timestamps with ~20μs jitter printed once per second.**
 
 ---
 
