@@ -65,7 +65,7 @@ The parts you need for this are:
 
 I used a small breadboard to assemble it. The only soldering needed is to solder header pins onto the TRRS breakout board.
 
-You also need a USB audio card with a LINE IN (not just a MIC IN). The one I found has multiple inputs and outputs including SPDIF. It cost about $9.
+You also need a USB audio card with a LINE IN. The one I found has multiple inputs and outputs including SPDIF. It cost about $9. This circuit is designed for a LINE IN, and should not be plugged into a MIC IN, which expects a much lower voltage.
 
 ![audio](assets/audio.jpg)
 
@@ -133,3 +133,5 @@ MS Name/IP address         Stratum Poll Reach LastRx Last sample
 The tracking RMS offset settles down to about 1.6µs.
 
 CPU usage is about 1.8% (of one core) on a Mac mini M4.
+
+A future possibility would be to plug into the headset jack of a Mac. This uses a TRRS plug, with Sleeve being the MIC in, and Ring 2 (next to sleeve) being GND. The expected voltage is much smaller, so the resistor values would need to change.
