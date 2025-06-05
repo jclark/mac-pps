@@ -11,7 +11,7 @@ For more background, see Jeff Geerling's [blog post](https://www.jeffgeerling.co
 - don't use PPS; just rely on timing derived from NMEA messages (Jeff claims this can achieve 1ms precision, but I think that is an illusion)
 - use Linux in a VM (e.g. using Docker) with USB pass through; this allows you to leverage Linux kernel support for PPS (I haven't tried this but it's a plausible approach)
 
-This repo is an attempt to provide some additional possibilities.
+This repo is an attempt to provide some additional possibilities. This is proof-of-concept code, not production quality. I mostly vibe-coded it (with Claude Code).
 
 ## Polling modem status lines
 
@@ -123,11 +123,13 @@ The important option here is the `offset`. It turns that the time has a constant
 ```
 MS Name/IP address         Stratum Poll Reach LastRx Last sample               
 ===============================================================================
-#* SND                           0   4   377    19  -3363ns[-4526ns] +/-   23us
-^- ntp.lan                       1   0   377     4    -44us[  -44us] +/-  217us
-^- clock.nectec.or.th            1   7   377    81   -502us[ -500us] +/- 4181us
-^- ntp1.bknix.net                1   7   377    79   -552us[ -549us] +/- 3927us
-^- time1.nimt.or.th              1   7   377    14    -86us[  -87us] +/- 3851us
+#* SND                           0   4   377    17  +3924ns[+8730ns] +/-   23us
+^- ntp.lan                       1   0   377     2    -16us[  -16us] +/-  194us
+^- clock.nectec.or.th            1  10   377   721   -411us[ -461us] +/- 4173us
+^- ntp1.bknix.net                1  10   377   192   -836us[ -835us] +/- 4425us
+^- time1.nimt.or.th              1  10   377   197    -18us[  -18us] +/- 3741us
 ```
 
-The tracking RMS offset is about 2.5µs.
+The tracking RMS offset settles down to about 1.6µs.
+
+CPU usage is about 1.8% (of one core) on a Mac mini M4.
