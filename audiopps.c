@@ -9,12 +9,17 @@
 #include <unistd.h>
 #include <mach/mach_time.h>
 #include <math.h>
+#include <stdbool.h>
+#include "chrony_client.h"
 
 static CFRunLoopRef runLoop = NULL;
 static AudioQueueRef audioQueue = NULL;
 static volatile sig_atomic_t keepRunning = 1;
 static int debugMode = 0;
 static float pulseThreshold = 0.5f;
+static chrony_client_t *chrony_client = NULL;
+static bool use_chrony = false;
+static char remote_path[256] = "/var/run/chrony.audiopps.sock";
 
 void list_input_sources(AudioDeviceID deviceID);
 
@@ -111,8 +116,16 @@ void audio_input_callback(void *inUserData,
                 struct timeval pulse_time;
                 convert_past_host_time_to_timeval(precise_pulse_time, &pulse_time);
                 
-                printf("PPS detected at %ld.%06d (level: %.3f, sample: %u/%u)\n", 
-                       pulse_time.tv_sec, pulse_time.tv_usec, sample, i, numSamples);
+                /* Calculate offset: system time fractional part minus true time (0.0 at top of second) */
+                double offset = ((double)pulse_time.tv_usec / 1000000.0) - 0.0;
+                
+                /* Send sample to chrony if enabled */
+                if (use_chrony && chrony_client_send_pps(chrony_client, &pulse_time, offset) < 0) {
+                    fprintf(stderr, "Failed to send chrony sample\n");
+                }
+                
+                printf("PPS detected at %ld.%06d (level: %.3f, sample: %u/%u, offset: %.6f)\n", 
+                       pulse_time.tv_sec, pulse_time.tv_usec, sample, i, numSamples, offset);
                 
                 last_pulse_time = precise_pulse_time;
                 pulse_detected = 1;
@@ -406,12 +419,15 @@ void usage(const char *progname) {
     fprintf(stderr, "  --help            Show this help message\n");
     fprintf(stderr, "  --debug           Show audio levels and detection info\n");
     fprintf(stderr, "  --threshold N     Set pulse detection threshold (default: 0.5)\n");
+    fprintf(stderr, "  --chrony          Send timing samples to chrony\n");
+    fprintf(stderr, "  --remote-path P   Remote chrony socket path (default: %s)\n", remote_path);
     fprintf(stderr, "\n");
     fprintf(stderr, "Examples:\n");
     fprintf(stderr, "  %s\n", progname);
     fprintf(stderr, "  %s --debug --threshold 0.1\n", progname);
     fprintf(stderr, "  %s \"AppleUSBAudioEngine:...:2\"\n", progname);
     fprintf(stderr, "  %s \"AppleUSBAudioEngine:...:2\" \"External Line Connector\"\n", progname);
+    fprintf(stderr, "  %s --chrony \"AppleUSBAudioEngine:...:2\"\n", progname);
 }
 
 int main(int argc, char *argv[]) {
@@ -435,6 +451,19 @@ int main(int argc, char *argv[]) {
                 argIndex += 2;
             } else {
                 fprintf(stderr, "Error: --threshold requires a value\n");
+                usage(argv[0]);
+                return 1;
+            }
+        } else if (strcmp(argv[argIndex], "--chrony") == 0) {
+            use_chrony = true;
+            argIndex++;
+        } else if (strcmp(argv[argIndex], "--remote-path") == 0) {
+            if (argIndex + 1 < argc) {
+                strncpy(remote_path, argv[argIndex + 1], sizeof(remote_path) - 1);
+                remote_path[sizeof(remote_path) - 1] = '\0';
+                argIndex += 2;
+            } else {
+                fprintf(stderr, "Error: --remote-path requires a value\n");
                 usage(argv[0]);
                 return 1;
             }
@@ -538,6 +567,16 @@ int main(int argc, char *argv[]) {
         }
     }
     
+    /* Set up chrony client if requested */
+    if (use_chrony) {
+        chrony_client = chrony_client_create(NULL, remote_path);
+        if (chrony_client == NULL) {
+            fprintf(stderr, "Failed to setup chrony client\n");
+            AudioQueueDispose(audioQueue, true);
+            return 1;
+        }
+    }
+    
     status = AudioQueueStart(audioQueue, NULL);
     if (status != noErr) {
         fprintf(stderr, "Error starting audio queue: %d\n", (int)status);
@@ -551,6 +590,12 @@ int main(int argc, char *argv[]) {
     } else {
         printf("Using default audio input device\n");
     }
+    if (use_chrony) {
+        printf("Local socket: %s\n", chrony_client_local_path(chrony_client));
+        printf("Remote socket: %s\n", chrony_client_remote_path(chrony_client));
+    } else {
+        printf("Chrony integration disabled\n");
+    }
     
     runLoop = CFRunLoopGetCurrent();
     while (keepRunning) {
@@ -561,6 +606,11 @@ int main(int argc, char *argv[]) {
     
     AudioQueueStop(audioQueue, true);
     AudioQueueDispose(audioQueue, true);
+    
+    /* Cleanup chrony client */
+    if (chrony_client) {
+        chrony_client_destroy(chrony_client);
+    }
     
     return 0;
 }
