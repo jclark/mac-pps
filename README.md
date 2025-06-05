@@ -112,5 +112,22 @@ PPS detected at 1749040540.000374 (level: 0.222, sample: 458/1024)
 
 This is an order of magnitude better than the modem status line polling.
 
-I haven't yet hooked this up to chrony.
+To use with chrony, add a `--chrony` option, run with `sudo` and put something like this in your chrony config file
 
+```
+refclock SOCK /var/run/chrony.audiopps.sock pps delay 4e-5 offset 35e-5 precision 3e-6 refid SND
+```
+
+The important option here is the `offset`. It turns that the time has a constant error of about 0.35ms. I determined this by calibrating against a high quality NTP server on my LAN. Once this constant error is corrected, the performance is impressive.
+
+```
+MS Name/IP address         Stratum Poll Reach LastRx Last sample               
+===============================================================================
+#* SND                           0   4   377    19  -3363ns[-4526ns] +/-   23us
+^- ntp.lan                       1   0   377     4    -44us[  -44us] +/-  217us
+^- clock.nectec.or.th            1   7   377    81   -502us[ -500us] +/- 4181us
+^- ntp1.bknix.net                1   7   377    79   -552us[ -549us] +/- 3927us
+^- time1.nimt.or.th              1   7   377    14    -86us[  -87us] +/- 3851us
+```
+
+The tracking RMS offset is about 2.5µs.
